@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>女の子育成ゲーム - My Little Protégé</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Kosugi Maru', 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            touch-action: manipulation; /* スマホでのダブルタップズーム防止 */
+            user-select: none;
+        }
+
+        .bg-pattern {
+            background-color: #ffdeeb;
+            background-image: radial-gradient(#ffb6c1 2px, transparent 2px);
+            background-size: 30px 30px;
+        }
+
+        /* キャラクターのアニメーション */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .char-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05) translateY(-5px); }
+        }
+
+        .action-anim {
+            animation: bounce 0.3s ease;
+        }
+
+        /* ステータスバーのトランジション */
+        .stat-bar-fill {
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* モーダル用 */
+        .modal-enter {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+        .modal-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 bg-pattern">
+
+    <!-- ゲームコンテナ -->
+    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden w-full max-w-md border-4 border-white">
+        
+        <!-- ヘッダー (日数) -->
+        <div class="bg-pink-400 text-white text-center py-3 px-6 flex justify-between items-center shadow-md">
+            <h1 class="text-xl font-bold tracking-wider">育成ダイアリー</h1>
+            <div class="bg-white/20 px-3 py-1 rounded-full text-lg font-bold">
+                <span id="day-counter">1</span> / 30 日目
+            </div>
+        </div>
+
+        <div class="p-6">
+            <!-- キャラクター表示エリア -->
+            <div class="relative w-full h-48 bg-blue-50 rounded-2xl border-2 border-blue-100 flex justify-center items-end overflow-hidden mb-6 shadow-inner">
+                <!-- SVGキャラクター -->
+                <div id="character" class="char-float cursor-pointer w-32 h-32 mb-2" onclick="pokeCharacter()">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <!-- 髪の後ろ -->
+                        <path d="M20,50 Q10,80 25,95 Q40,90 30,60" fill="#FFB6C1" />
+                        <path d="M80,50 Q90,80 75,95 Q60,90 70,60" fill="#FFB6C1" />
+                        
+                        <!-- 顔 -->
+                        <circle cx="50" cy="55" r="30" fill="#FFE0BD" />
+                        
+                        <!-- 目 (通常) -->
+                        <g id="eyes-normal" class="eyes">
+                            <circle cx="38" cy="50" r="4" fill="#4A4A4A" />
+                            <circle cx="62" cy="50" r="4" fill="#4A4A4A" />
+                            <!-- ハイライト -->
+                            <circle cx="37" cy="49" r="1.5" fill="#FFF" />
+                            <circle cx="61" cy="49" r="1.5" fill="#FFF" />
+                        </g>
+
+                        <!-- 目 (笑顔 / 遊び・休む) -->
+                        <g id="eyes-happy" class="eyes hidden">
+                            <path d="M33,52 Q38,45 43,52" stroke="#4A4A4A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                            <path d="M57,52 Q62,45 67,52" stroke="#4A4A4A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                        </g>
+
+                        <!-- 目 (疲労 / 高ストレス) -->
+                        <g id="eyes-tired" class="eyes hidden">
+                            <path d="M34,48 L42,50" stroke="#4A4A4A" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M66,48 L58,50" stroke="#4A4A4A" stroke-width="2" stroke-linecap="round"/>
+                            <circle cx="38" cy="51" r="2" fill="#4A4A4A" opacity="0.5" />
+                            <circle cx="62" cy="51" r="2" fill="#4A4A4A" opacity="0.5" />
+                        </g>
+
+                        <!-- ほっぺ -->
+                        <circle cx="33" cy="58" r="5" fill="#FF69B4" opacity="0.3" id="cheek-l"/>
+                        <circle cx="67" cy="58" r="5" fill="#FF69B4" opacity="0.3" id="cheek-r"/>
+
+                        <!-- 口 (通常) -->
+                        <path id="mouth-normal" class="mouth" d="M45,65 Q50,70 55,65" stroke="#4A4A4A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                        <!-- 口 (笑顔) -->
+                        <path id="mouth-happy" class="mouth hidden" d="M42,62 Q50,75 58,62 Z" fill="#FF8C9A" stroke="#4A4A4A" stroke-width="1.5"/>
+                        <!-- 口 (疲れ) -->
+                        <path id="mouth-tired" class="mouth hidden" d="M45,67 Q50,64 55,67" stroke="#4A4A4A" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+                        <!-- 前髪 -->
+                        <path d="M20,50 Q30,20 50,20 Q70,20 80,50 Q75,30 65,30 Q60,40 50,30 Q40,40 35,30 Q25,30 20,50" fill="#FFB6C1" />
+                        <path d="M40,20 L45,35 L55,35 L60,20 Z" fill="#FFB6C1" />
+                    </svg>
+                </div>
+                <!-- ふきだしメッセージ -->
+                <div id="speech-bubble" class="absolute top-4 left-4 bg-white px-3 py-2 rounded-2xl rounded-bl-none shadow-md text-sm font-bold text-gray-700 opacity-0 transition-opacity duration-300 pointer-events-none max-w-[150px]">
+                    よろしくね！
+                </div>
+            </div>
+
+            <!-- ステータスエリア -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <!-- 知力 -->
+                <div class="bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                        <span>📚 知力</span>
+                        <span id="val-int">0</span>
+                    </div>
+                    <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div id="bar-int" class="h-full bg-blue-400 stat-bar-fill w-0"></div>
+                    </div>
+                </div>
+                <!-- 魅力 -->
+                <div class="bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                        <span>✨ 魅力</span>
+                        <span id="val-cha">0</span>
+                    </div>
+                    <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div id="bar-cha" class="h-full bg-pink-400 stat-bar-fill w-0"></div>
+                    </div>
+                </div>
+                <!-- 体力 -->
+                <div class="bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                        <span>🏃‍♀️ 体力</span>
+                        <span id="val-sta">20</span>
+                    </div>
+                    <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div id="bar-sta" class="h-full bg-green-400 stat-bar-fill w-[20%]"></div>
+                    </div>
+                </div>
+                <!-- ストレス -->
+                <div class="bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                        <span>💢 ストレス</span>
+                        <span id="val-str">0</span>
+                    </div>
+                    <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div id="bar-str" class="h-full bg-purple-500 stat-bar-fill w-0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- メッセージログ -->
+            <div id="log-box" class="h-12 bg-gray-100 rounded-lg flex items-center justify-center px-4 mb-6 text-sm text-gray-600 font-bold border border-gray-200 text-center">
+                行動を選んでね！
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="doAction('study')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_#2563eb] active:shadow-[0_0px_0_#2563eb] active:translate-y-1 transition-all">
+                    📚 勉強する
+                </button>
+                <button onclick="doAction('dance')" class="bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_#db2777] active:shadow-[0_0px_0_#db2777] active:translate-y-1 transition-all">
+                    ✨ レッスン
+                </button>
+                <button onclick="doAction('exercise')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_#16a34a] active:shadow-[0_0px_0_#16a34a] active:translate-y-1 transition-all">
+                    🏃‍♀️ 運動する
+                </button>
+                <button onclick="doAction('rest')" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_#ca8a04] active:shadow-[0_0px_0_#ca8a04] active:translate-y-1 transition-all">
+                    ☕ 休ませる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- エンディングモーダル -->
+    <div id="end-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-pink-300 transform scale-90 opacity-0 transition-all duration-300" id="modal-content">
+            <h2 class="text-3xl font-bold text-pink-500 mb-2">30日経過！</h2>
+            <div class="text-5xl my-4" id="end-icon">🎓</div>
+            <h3 class="text-xl font-bold text-gray-800 mb-4" id="end-title">天才学者になりました</h3>
+            <p class="text-gray-600 mb-6 text-sm leading-relaxed" id="end-desc">
+                毎日の勉強が実を結び、若くして大発見を成し遂げました。将来が楽しみですね！
+            </p>
+            <div class="bg-gray-100 rounded-lg p-3 mb-6 text-left text-xs text-gray-600">
+                <p>最終ステータス：</p>
+                <p>知力: <span id="final-int"></span> | 魅力: <span id="final-cha"></span> | 体力: <span id="final-sta"></span></p>
+            </div>
+            <button onclick="resetGame()" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition active:scale-95">
+                もう一度育てる
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ゲームの状態
+        const MAX_DAYS = 30;
+        let state = {
+            day: 1,
+            int: 0,
+            cha: 0,
+            sta: 20,
+            str: 0
+        };
+
+        // DOM要素のキャッシュ
+        const els = {
+            day: document.getElementById('day-counter'),
+            vInt: document.getElementById('val-int'),
+            vCha: document.getElementById('val-cha'),
+            vSta: document.getElementById('val-sta'),
+            vStr: document.getElementById('val-str'),
+            bInt: document.getElementById('bar-int'),
+            bCha: document.getElementById('bar-cha'),
+            bSta: document.getElementById('bar-sta'),
+            bStr: document.getElementById('bar-str'),
+            log: document.getElementById('log-box'),
+            char: document.getElementById('character'),
+            bubble: document.getElementById('speech-bubble'),
+            modal: document.getElementById('end-modal'),
+            modalContent: document.getElementById('modal-content'),
+        };
+
+        const eyes = {
+            normal: document.getElementById('eyes-normal'),
+            happy: document.getElementById('eyes-happy'),
+            tired: document.getElementById('eyes-tired'),
+        };
+        const mouths = {
+            normal: document.getElementById('mouth-normal'),
+            happy: document.getElementById('mouth-happy'),
+            tired: document.getElementById('mouth-tired'),
+        };
+
+        // アクションの定義
+        const actions = {
+            study: { 
+                name: '勉強', 
+                effects: { int: 8, sta: -3, str: 5 },
+                msg: '机に向かって一生懸命勉強した！',
+                exp: 'normal'
+            },
+            dance: { 
+                name: 'レッスン', 
+                effects: { cha: 8, sta: -2, str: 4 },
+                msg: '鏡の前でポーズと笑顔の練習をした！',
+                exp: 'happy'
+            },
+            exercise: { 
+                name: '運動', 
+                effects: { sta: 7, cha: 2, str: 3 },
+                msg: '外を元気に走り回って体力をつけた！',
+                exp: 'normal'
+            },
+            rest: { 
+                name: '休息', 
+                effects: { sta: 5, str: -15 },
+                msg: 'ゆっくり休んでリフレッシュした！',
+                exp: 'happy'
+            }
+        };
+
+        let bubbleTimeout;
+
+        function showSpeechBubble(text, duration = 2000) {
+            els.bubble.textContent = text;
+            els.bubble.style.opacity = '1';
+            clearTimeout(bubbleTimeout);
+            bubbleTimeout = setTimeout(() => {
+                els.bubble.style.opacity = '0';
+            }, duration);
+        }
+
+        function pokeCharacter() {
+            if (state.str > 70) {
+                showSpeechBubble("ちょっと疲れたかも...");
+            } else if (state.sta < 20) {
+                showSpeechBubble("おなかすいたー");
+            } else {
+                showSpeechBubble("がんばるよ！");
+                setFace('happy');
+                setTimeout(updateFaceByState, 1000);
+            }
+        }
+
+        function setFace(type) {
+            // 一旦全て非表示
+            Object.values(eyes).forEach(el => el.classList.add('hidden'));
+            Object.values(mouths).forEach(el => el.classList.add('hidden'));
+
+            // 指定されたものを表示
+            if (eyes[type]) eyes[type].classList.remove('hidden');
+            if (mouths[type]) mouths[type].classList.remove('hidden');
+        }
+
+        function updateFaceByState() {
+            if (state.str >= 80 || state.sta <= 10) {
+                setFace('tired');
+            } else {
+                setFace('normal');
+            }
+        }
+
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+
+        function updateUI() {
+            els.day.textContent = state.day;
+            
+            // 値の更新
+            els.vInt.textContent = state.int;
+            els.vCha.textContent = state.cha;
+            els.vSta.textContent = state.sta;
+            els.vStr.textContent = state.str;
+
+            // バーの更新 (最大100として計算)
+            els.bInt.style.width = `${clamp(state.int, 0, 100)}%`;
+            els.bCha.style.width = `${clamp(state.cha, 0, 100)}%`;
+            els.bSta.style.width = `${clamp(state.sta, 0, 100)}%`;
+            els.bStr.style.width = `${clamp(state.str, 0, 100)}%`;
+
+            // ストレスバーの色変化
+            if(state.str > 80) els.bStr.className = "h-full bg-red-600 stat-bar-fill";
+            else if(state.str > 50) els.bStr.className = "h-full bg-yellow-500 stat-bar-fill";
+            else els.bStr.className = "h-full bg-purple-500 stat-bar-fill";
+
+            updateFaceByState();
+        }
+
+        function doAction(actionKey) {
+            if (state.day > MAX_DAYS) return;
+
+            // アニメーション再生
+            els.char.classList.remove('action-anim');
+            void els.char.offsetWidth; // リフロー強制
+            els.char.classList.add('action-anim');
+
+            const act = actions[actionKey];
+
+            // 過労チェック (体力が0以下での行動は失敗しやすい)
+            if (actionKey !== 'rest' && state.sta < 5) {
+                els.log.textContent = "体力がなくてうまく活動できなかった...";
+                state.str = clamp(state.str + 10, 0, 100);
+                showSpeechBubble("むりぃ...");
+                setFace('tired');
+            } else {
+                // ステータス反映
+                if (act.effects.int) state.int = clamp(state.int + act.effects.int + Math.floor(Math.random()*3), 0, 100);
+                if (act.effects.cha) state.cha = clamp(state.cha + act.effects.cha + Math.floor(Math.random()*3), 0, 100);
+                if (act.effects.sta) state.sta = clamp(state.sta + act.effects.sta, 0, 100);
+                if (act.effects.str) state.str = clamp(state.str + act.effects.str, 0, 100);
+
+                els.log.textContent = act.msg;
+                
+                // 表情を一時的に変更
+                setFace(act.exp);
+                let bubbleMsg = act.exp === 'happy' ? "たのしい！" : "がんばる！";
+                if(actionKey === 'rest') bubbleMsg = "すやすや...";
+                showSpeechBubble(bubbleMsg, 1500);
+            }
+
+            // ストレス爆発判定 (バッドエンド直行またはペナルティ)
+            if (state.str >= 100) {
+                els.log.textContent = "ストレスが限界で寝込んでしまった...";
+                state.sta = clamp(state.sta - 20, 0, 100);
+                state.str = 50; // 強制休養
+                state.day += 2; // 2日ロス
+            } else {
+                state.day++;
+            }
+
+            updateUI();
+
+            // エンディング判定
+            if (state.day > MAX_DAYS) {
+                setTimeout(showEnding, 1000);
+                els.log.textContent = "30日間が終了しました！";
+            } else {
+                setTimeout(updateFaceByState, 1500); // 一定時間後に状態に応じた顔に戻す
+            }
+        }
+
+        function showEnding() {
+            let title = "";
+            let desc = "";
+            let icon = "";
+
+            // 優先度つきの条件判定
+            if (state.int >= 80 && state.int > state.cha && state.int > state.sta) {
+                title = "天才学者";
+                desc = "毎日の勉強が実を結び、若くして大発見を成し遂げました！知的な魅力にあふれています。";
+                icon = "🔬";
+            } else if (state.cha >= 80 && state.cha > state.int && state.cha > state.sta) {
+                title = "トップアイドル";
+                desc = "持ち前の魅力と毎日のレッスンで、国民的アイドルに成長しました！ステージで輝いています。";
+                icon = "🎤";
+            } else if (state.sta >= 80 && state.sta > state.int && state.sta > state.cha) {
+                title = "金メダリスト";
+                desc = "無尽蔵の体力を活かし、スポーツの世界で大成功を収めました！健康第一！";
+                icon = "🏅";
+            } else if (state.int >= 50 && state.cha >= 50) {
+                title = "人気キャスター";
+                desc = "知性と魅力を兼ね備え、テレビの人気者になりました！";
+                icon = "📺";
+            } else {
+                title = "元気な一般人";
+                desc = "大きなトラブルもなく、健康で普通の女の子に育ちました。平和が一番ですね！";
+                icon = "🌸";
+            }
+
+            document.getElementById('end-title').textContent = title;
+            document.getElementById('end-desc').textContent = desc;
+            document.getElementById('end-icon').textContent = icon;
+            
+            document.getElementById('final-int').textContent = state.int;
+            document.getElementById('final-cha').textContent = state.cha;
+            document.getElementById('final-sta').textContent = state.sta;
+
+            els.modal.classList.remove('hidden');
+            // 少し遅らせてアニメーションさせる
+            setTimeout(() => {
+                els.modalContent.classList.remove('scale-90', 'opacity-0');
+                els.modalContent.classList.add('scale-100', 'opacity-100');
+            }, 50);
+        }
+
+        function resetGame() {
+            els.modalContent.classList.remove('scale-100', 'opacity-100');
+            els.modalContent.classList.add('scale-90', 'opacity-0');
+            
+            setTimeout(() => {
+                els.modal.classList.add('hidden');
+                state = {
+                    day: 1,
+                    int: 0,
+                    cha: 0,
+                    sta: 20,
+                    str: 0
+                };
+                els.log.textContent = "新しい生活が始まります！行動を選んでね。";
+                updateUI();
+                showSpeechBubble("またよろしくね！");
+            }, 300);
+        }
+
+        // 初期化
+        updateUI();
+        setTimeout(() => showSpeechBubble("よろしくね！"), 500);
+
+    </script>
+</body>
+</html>
